@@ -1,38 +1,27 @@
-# <WARNING>
-# Everything within sections like <TAG> is generated and can
-# be automatically replaced on deployment. You can disable
-# this functionality by simply removing the wrapping tags.
-# </WARNING>
+# Use an official Python runtime as a parent image
+FROM python:3.7
+LABEL maintainer="hello@wagtail.io"
 
-# <DOCKER_FROM>
-FROM divio/base:4.15-py3.6-slim-stretch
-# </DOCKER_FROM>
+# Set environment varibles
+ENV PYTHONUNBUFFERED 1
+ENV DJANGO_ENV dev
 
-# <NPM>
-# </NPM>
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --upgrade pip
+# Install any needed packages specified in requirements.txt
+RUN pip install -r /code/requirements.txt
+RUN pip install gunicorn
 
-# <BOWER>
-# </BOWER>
+# Copy the current directory contents into the container at /code/
+COPY . /code/
+# Set the working directory to /code/
+WORKDIR /code/
 
-# <PYTHON>
-ENV PIP_INDEX_URL=${PIP_INDEX_URL:-https://wheels.aldryn.net/v1/aldryn-extras+pypi/${WHEELS_PLATFORM:-aldryn-baseproject-py3}/+simple/} \
-    WHEELSPROXY_URL=${WHEELSPROXY_URL:-https://wheels.aldryn.net/v1/aldryn-extras+pypi/${WHEELS_PLATFORM:-aldryn-baseproject-py3}/}
-COPY requirements.* /app/
-COPY addons-dev /app/addons-dev/
-RUN pip-reqs compile && \
-    pip-reqs resolve && \
-    pip install \
-        --no-index --no-deps \
-        --requirement requirements.urls
-# </PYTHON>
+RUN python manage.py migrate
 
-# <SOURCE>
-COPY . /app
-# </SOURCE>
+RUN useradd wagtail
+RUN chown -R wagtail /code
+USER wagtail
 
-# <GULP>
-# </GULP>
-
-# <STATIC>
-RUN DJANGO_MODE=build python manage.py collectstatic --noinput
-# </STATIC>
+EXPOSE 8000
+CMD exec gunicorn mysite.wsgi:application --bind 0.0.0.0:8000 --workers 3
